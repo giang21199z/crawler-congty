@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Feb 09, 2023 at 04:49 PM
+-- Generation Time: Feb 10, 2023 at 06:03 PM
 -- Server version: 10.4.24-MariaDB
 -- PHP Version: 7.4.29
 
@@ -41,7 +41,7 @@ CREATE TABLE `company_info` (
   `status` varchar(64) NOT NULL,
   `data_raw` text NOT NULL,
   `email` varchar(256) NOT NULL,
-  `image` text NOT NULL
+  `description` text NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
 -- --------------------------------------------------------
@@ -116,7 +116,7 @@ ALTER TABLE `company_info`
 -- AUTO_INCREMENT for table `company_link`
 --
 ALTER TABLE `company_link`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=39;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
 
 --
 -- AUTO_INCREMENT for table `company_source`
