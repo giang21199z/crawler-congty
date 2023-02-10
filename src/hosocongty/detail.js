@@ -9,112 +9,135 @@ const connection = mysql.createConnection({
   database: "company_info"
 });
 
-// \n            Địa chỉ: 280 khu phố Lộc Du, Phường Trảng Bàng, Thị xã Trảng Bàng, Tỉnh Tây Ninh
-const extractAddress = (data) => {
-  data = data.replace('\n', '');
-  data = data.trim();
-  if (data.indexOf(':') !==-1) {
-    data = data.split(':')[1];
+const cfDecodeEmail = (encodedString) => {
+  var email = "", r = parseInt(encodedString.substr(0, 2), 16), n, i;
+  for (n = 2; encodedString.length - n; n += 2){
+    i = parseInt(encodedString.substr(n, 2), 16) ^ r;
+  email += String.fromCharCode(i);
   }
-  return data.trim();
+  return email;
 }
 
-// "\n            Đại diện pháp luật: Nguyễn Tấn Phát"
-const extractOwner = (data) => {
-  data = data.replace('\n', '');
-  data = data.trim();
-  if (data.indexOf(':') !==-1) {
-    data = data.split(':')[1];
-  }
-  return data.trim();
-}
-
-// "                                    Ngày cấp giấy phép: 08/02/2023"
-const extractSignDate = (data) => {
-  data = data.replace('\n', '');
-  data = data.trim();
-  if (data.indexOf(':') !==-1) {
-    data = data.split(':')[1];
-  }
-  return data.trim();
-}
-
-// Ngày hoạt động: 08/02/2023 (<em>Đã hoạt động 22 giờ</em>)"
-const extractActiveDate = (data) => {
-  data = data.replace('\n', '');
-  data = data.trim();
-  if (data.indexOf(':') !==-1) {
-    data = data.split(':')[1];
-  }
-  const indexNgoac = data.indexOf('(');
-  if (indexNgoac !== -1) {
-    data = data.substr(0, indexNgoac - 1);
-  }
-  return data.trim();
-}
-
-//             Trạng thái: Đang hoạt động
-const extractStatus = (data) => {
-  data = data.trim();
-  if (data.indexOf(':') !==-1) {
-    data = data.split(':')[1]
-  }
-  return data.trim();
-}
-
-//
-const extractType = (data) => {
-  const lastIndex = data.lastIndexOf(':')
-  if (lastIndex !== -1) {
-    data = data.substr(lastIndex + 1);
-  }
-  return data.trim();
-}
-// Điện thoại trụ sở: <img src=\"data:image/png;base64,iVBORw0KGgo
-const extractPhoneImg = (data) => {
-  data = data.trim();
-  const indexSrc = data.indexOf('<img');
-  if (indexSrc === -1) {
-    // khong co image phone
-    return null
-  }
-  data = data.substr(indexSrc);
-  return data;
-}
-
-const execute = async () => {
+const extractCompanyFromLink = async (link, url) => {
   try {
-    const url = 'https://www.tratencongty.com/company/121acb5cb-cong-ty-tnhh-tm-dv-tong-hop-va-xay-dung-tan-phat/';
     console.log('Start crawler: ', url);
     const response = await request(url);
     const $ = cheerio.load(response);
-    const dataRaw = $('.jumbotron').first();
-    const name = dataRaw.find('h4').text();
+    let name = '';
     let tax_code = '';
-    dataRaw.find('a').each((index, el) => {
-      if (index === 1) {
-        tax_code = $(el).text();
+    let address = '';
+    let owner = '';
+    let email = '';
+    let phone = '';
+    let active_date = '';
+    let description = '';
+    let status = '';
+    $('.hsct').each((index, el) => {
+      if (index === 0) {
+        // included: name, address, tax_code
+        const liTag = $(el).find('li');
+        $(liTag).each((index, el) => {
+          if (index === 0) {
+            // handle name
+            name = $(el).text();
+          } else if (index === 1) {
+            // handle tax_code
+            tax_code = $(el).find('span').text();
+          } else if (index === 2) {
+            // handle address
+            address = $(el).find('span').text();
+          }
+        })
+      } else if (index === 1) {
+        // included: owner, phone, active_date, description, status
+        const liTag = $(el).find('li');
+        $(liTag).each((index, el) => {
+          const label = $(el).find('label').text().trim();
+          if (label.startsWith('Đạ')) { // handle owner
+            owner = $(el).find('span').text();
+            return;
+          } else if (label.startsWith('Đi')) { // handle phone
+            phone = $(el).find('span').text();
+            return;
+          } else if (label.startsWith('E')) { // handle email
+            email = $(el).find('span a').attr('data-cfemail');
+            if (email) {
+              email = cfDecodeEmail(email).toLowerCase();
+            }
+            return;
+          } else if (label.startsWith('Ngày')) { // handle active_date
+            active_date = $(el).find('span').text();
+            return;
+          } else if (label.startsWith('Ngàn')) { // handle description
+            description = $(el).find('span').text();
+            return;
+          } else if (label.startsWith('T')) { // handle status
+            status = $(el).find('span').text();
+            return;
+          }
+        })
       }
     })
-    const data_raw = dataRaw.toString();
-    const spreadData = data_raw.split('<br>');
-    const type = extractType(spreadData[0]);
-    const address = extractAddress(spreadData[2]);
-    const owner = extractOwner(spreadData[3]);
-    const sign_date = extractSignDate(spreadData[4]);
-    const active_date = extractActiveDate(spreadData[5]);
-    const image = extractPhoneImg(spreadData[6]) || url;
-    const status = extractStatus(spreadData[7]);
-    const phone = '';
-    const companyInfo = { name, type, tax_code, address, owner, sign_date, active_date, status, image, phone, data_raw };
-    console.log(companyInfo);
+    const companyInfo = [link, name, email, tax_code, address, owner, active_date, status, phone, description];
+    return companyInfo;
   } catch (err) {
     console.log(err);
   }
 }
 
+const getListLinkCompany = async (limit, offset) => {
+  return new Promise((resolve, reject) => {
+    connection.query(`SELECT id, link FROM company_link limit ${limit} offset ${offset}`, async function (error, results, fields) {
+      if (error) console.log('get error', error);
+      const arr = [];
+      const prefix = 'https://hosocongty.vn/';
+      for (const result of results) {
+        const { id, link } = result;
+        const url = prefix + link;
+        arr.push(extractCompanyFromLink(id, url))
+      }
+      try {
+        resolve(await Promise.all(arr))
+      } catch (e) {
+        reject(e);
+      }
+    })
+  })
+}
+
+const insertCompany = async (data) => {
+  return new Promise((resolve, reject) => {
+    // { link, name, tax_code, address, owner, active_date, status, phone, description };
+    connection.query('INSERT INTO company_info (link, name, email, tax_code, address, owner, active_date, status, phone, description) VALUES ?', [data], (err) => {
+      if (err) {
+        reject(err)
+      }
+      resolve(true)
+    })
+  })
+}
+
 connection.connect(function (err) {
   if (err) throw err;
   console.log("Db Connected. Ready for crawler.");
-  execute();
+  connection.query('SELECT COUNT(*) as totalItems FROM company_link', async function (error, results, fields) {
+    if (error) console.log('get error');
+    const { totalItems } = results[0];
+
+    const limit = 2;
+    let offset = 0;
+    while (offset < totalItems) {
+      console.log(`Crawl offset ${offset}.`)
+      const data = await getListLinkCompany(limit, offset);
+      try {
+        await insertCompany(data);
+        console.log(`Insert ${limit} of ${offset} success.`)
+      } catch (err) {
+        console.log(err);
+      }
+      offset += limit;
+    }
+  });
+
+
 });

@@ -12,7 +12,7 @@ const connection = mysql.createConnection({
 const totalPage = 226667;
 const size = 12;
 const execute = async () => {
-  for (let page = 1; page <= 2; page++) {
+  for (let page = 1; page <= totalPage; page++) {
     let count = 1;
     try {
       const url = `https://hosocongty.vn/page-${page}`;
@@ -26,9 +26,9 @@ const execute = async () => {
           const link = $(aTag).attr('href');
           const source = 2;
           const companyLink = { name, link, source };
-          connection.query('INSERT INTO company_link SET ?', companyLink, function (error, results, fields) {
+          const query = connection.query('INSERT INTO company_link SET ?', companyLink, function (error, results, fields) {
             if (error) {
-              console.log(`Error insert company:`, JSON.stringify(companyInfo));
+              console.log(`Error insert company:`, JSON.stringify(companyLink));
             }
             console.log(`Inserted ${(page - 1) * size + (count++)} success`);
           });

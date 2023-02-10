@@ -4,7 +4,8 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "start:get-link": "node src/hosocongty/index"
+    "start:get-link": "node src/hosocongty/index",
+    "start:get-detail": "node src/hosocongty/detail"
   },
   "author": "",
   "license": "ISC",
